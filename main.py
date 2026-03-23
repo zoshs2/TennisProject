@@ -8,6 +8,9 @@ from ball_detector import BallDetector
 from utils import scene_detect
 import argparse
 import torch
+import os
+
+from shot_recognition import RNNShotRecognizer
 
 def read_video(path_video):
     cap = cv2.VideoCapture(path_video)
@@ -30,7 +33,7 @@ def get_court_img():
     return court_img
 
 def main(frames, scenes, bounces, ball_track, homography_matrices, kps_court, persons_top, persons_bottom,
-         draw_trace=False, trace=7):
+         draw_trace=False, trace=7, shot_results=None):
     """
     :params
         frames: list of original images
@@ -116,6 +119,39 @@ def main(frames, scenes, bounces, ball_track, homography_matrices, kps_court, pe
                         minimap = cv2.circle(minimap, (int(person_point[0, 0, 0]), int(person_point[0, 0, 1])),
                                                            radius=0, color=(255, 0, 0), thickness=80)
 
+                if shot_results is not None and i < len(shot_results):
+                    shot_info = shot_results[i]
+                    probs = shot_info.get('probs', [0.0, 0.0, 0.0, 0.0])
+                    counts = shot_info.get('counts', {})
+                    shot_name = shot_info.get('shot', 'neutral')
+                    cv2.putText(
+                        img_res,
+                        f"Shot: {shot_name}",
+                        org=(30, 50),
+                        fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                        fontScale=1.0,
+                        color=(0, 255, 255),
+                        thickness=2,
+                    )
+                    cv2.putText(
+                        img_res,
+                        f"P(B)={probs[0]:.2f} P(F)={probs[1]:.2f} P(N)={probs[2]:.2f} P(S)={probs[3]:.2f}",
+                        org=(30, 85),
+                        fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                        fontScale=0.65,
+                        color=(255, 255, 0),
+                        thickness=2,
+                    )
+                    cv2.putText(
+                        img_res,
+                        f"Cnt B:{counts.get('backhand', 0)} F:{counts.get('forehand', 0)} S:{counts.get('serve', 0)}",
+                        org=(30, 115),
+                        fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                        fontScale=0.65,
+                        color=(255, 255, 0),
+                        thickness=2,
+                    )
+
                 minimap = cv2.resize(minimap, (width_minimap, height_minimap))
                 img_res[30:(30 + height_minimap), (width - 30 - width_minimap):(width - 30), :] = minimap
                 imgs_res.append(img_res)
@@ -141,6 +177,14 @@ if __name__ == '__main__':
     parser.add_argument('--path_bounce_model', type=str, help='path to pretrained model for bounce detection')
     parser.add_argument('--path_input_video', type=str, help='path to input video')
     parser.add_argument('--path_output_video', type=str, help='path to output video')
+    parser.add_argument('--path_shot_model', type=str, default=None, help='path to tennis_shot_recognition RNN model')
+    parser.add_argument(
+        '--path_shot_project',
+        type=str,
+        default=os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'tennis_shot_recognition')),
+        help='path to tennis_shot_recognition project root',
+    )
+    parser.add_argument('--shot_left_handed', action='store_true', help='whether player is left-handed')
     args = parser.parse_args()
     
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -165,8 +209,21 @@ if __name__ == '__main__':
     y_ball = [x[1] for x in ball_track]
     bounces = bounce_detector.predict(x_ball, y_ball)
 
+    shot_results = None
+    if args.path_shot_model:
+        print('shot recognition')
+        try:
+            shot_recognizer = RNNShotRecognizer(
+                shot_project_dir=args.path_shot_project,
+                model_path=args.path_shot_model,
+                left_handed=args.shot_left_handed,
+            )
+            shot_results = shot_recognizer.infer(frames)
+        except Exception as e:
+            print(f"Warning: shot recognition disabled ({e})")
+
     imgs_res = main(frames, scenes, bounces, ball_track, homography_matrices, kps_court, persons_top, persons_bottom,
-                    draw_trace=True)
+                    draw_trace=True, shot_results=shot_results)
 
     write(imgs_res, fps, args.path_output_video)
 
