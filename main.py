@@ -190,6 +190,10 @@ if __name__ == '__main__':
         help='path to tennis_shot_recognition project root',
     )
     parser.add_argument('--shot_left_handed', action='store_true', help='whether player is left-handed')
+    parser.add_argument('--shot_window_size', type=int, default=30, help='shot model sequence window size')
+    parser.add_argument('--shot_conf_threshold', type=float, default=0.98, help='shot confidence threshold')
+    parser.add_argument('--shot_min_gap_frames', type=int, default=60, help='minimum frame gap between counted shots')
+    parser.add_argument('--shot_active_window', type=int, default=30, help='frames to keep shot label active after detection')
     args = parser.parse_args()
     
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -222,6 +226,10 @@ if __name__ == '__main__':
                 shot_project_dir=args.path_shot_project,
                 model_path=args.path_shot_model,
                 left_handed=args.shot_left_handed,
+                window_size=args.shot_window_size,
+                confidence_threshold=args.shot_conf_threshold,
+                min_frames_between_shots=args.shot_min_gap_frames,
+                active_shot_window=args.shot_active_window,
             )
             shot_results = shot_recognizer.infer(frames)
         except Exception as e:
@@ -231,6 +239,5 @@ if __name__ == '__main__':
                     draw_trace=True, shot_results=shot_results)
 
     write(imgs_res, fps, args.path_output_video)
-
 
 

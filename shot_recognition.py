@@ -38,11 +38,23 @@ class RNNShotRecognizer:
     Adapter that reuses `tennis_shot_recognition` RNN inference logic inside TennisProject.
     """
 
-    def __init__(self, shot_project_dir: str, model_path: str, left_handed: bool = False, window_size: int = 30):
+    def __init__(
+        self,
+        shot_project_dir: str,
+        model_path: str,
+        left_handed: bool = False,
+        window_size: int = 30,
+        confidence_threshold: float = 0.98,
+        min_frames_between_shots: int = 60,
+        active_shot_window: int = 30,
+    ):
         self.shot_project_dir = os.path.abspath(shot_project_dir)
         self.model_path = model_path
         self.left_handed = left_handed
         self.window_size = window_size
+        self.confidence_threshold = confidence_threshold
+        self.min_frames_between_shots = min_frames_between_shots
+        self.active_shot_window = active_shot_window
 
         if self.shot_project_dir not in sys.path:
             sys.path.insert(0, self.shot_project_dir)
@@ -65,7 +77,10 @@ class RNNShotRecognizer:
         finally:
             os.chdir(old_cwd)
 
-        shot_counter = _ShotCounter()
+        shot_counter = _ShotCounter(
+            min_frames_between_shots=self.min_frames_between_shots,
+            confidence_threshold=self.confidence_threshold,
+        )
         features_pool = []
         results: List[Dict[str, Any]] = []
 
@@ -92,7 +107,7 @@ class RNNShotRecognizer:
 
             active_shot = (
                 shot_counter.last_shot
-                if shot_counter.frames_since_last_shot < 30 and shot_counter.last_shot != "neutral"
+                if shot_counter.frames_since_last_shot < self.active_shot_window and shot_counter.last_shot != "neutral"
                 else "neutral"
             )
             results.append(
