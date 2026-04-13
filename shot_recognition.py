@@ -38,11 +38,23 @@ class RNNShotRecognizer:
     Adapter that reuses `tennis_shot_recognition` RNN inference logic inside TennisProject.
     """
 
-    def __init__(self, shot_project_dir: str, model_path: str, left_handed: bool = False, window_size: int = 30):
+    def __init__(
+        self,
+        shot_project_dir: str,
+        model_path: str,
+        left_handed: bool = False,
+        window_size: int = 30,
+        confidence_threshold: float = 0.98,
+        min_frames_between_shots: int = 60,
+        active_shot_window: int = 30,
+    ):
         self.shot_project_dir = os.path.abspath(shot_project_dir)
         self.model_path = model_path
         self.left_handed = left_handed
         self.window_size = window_size
+        self.confidence_threshold = confidence_threshold
+        self.min_frames_between_shots = min_frames_between_shots
+        self.active_shot_window = active_shot_window
 
         if self.shot_project_dir not in sys.path:
             sys.path.insert(0, self.shot_project_dir)
@@ -53,6 +65,29 @@ class RNNShotRecognizer:
         self._keras = keras
         self._HumanPoseExtractor = HumanPoseExtractor
         self._model = self._keras.models.load_model(self.model_path)
+        self.window_size = self._resolve_window_size(self.window_size)
+
+    def _resolve_window_size(self, requested_window_size: int) -> int:
+        """
+        Ensure runtime window size matches the loaded model's expected sequence length.
+        """
+        try:
+            input_shape = getattr(self._model, "input_shape", None)
+            if isinstance(input_shape, list):
+                input_shape = input_shape[0]
+            expected_window = None
+            if input_shape and len(input_shape) >= 2:
+                expected_window = input_shape[1]
+            if isinstance(expected_window, int) and expected_window > 0:
+                if expected_window != requested_window_size:
+                    print(
+                        f"Warning: overriding shot_window_size={requested_window_size} "
+                        f"with model-required value {expected_window}",
+                    )
+                return expected_window
+        except Exception:
+            pass
+        return requested_window_size
 
     def infer(self, frames: List[np.ndarray]) -> List[Dict[str, Any]]:
         if not frames:
@@ -65,7 +100,10 @@ class RNNShotRecognizer:
         finally:
             os.chdir(old_cwd)
 
-        shot_counter = _ShotCounter()
+        shot_counter = _ShotCounter(
+            min_frames_between_shots=self.min_frames_between_shots,
+            confidence_threshold=self.confidence_threshold,
+        )
         features_pool = []
         results: List[Dict[str, Any]] = []
 
@@ -92,7 +130,7 @@ class RNNShotRecognizer:
 
             active_shot = (
                 shot_counter.last_shot
-                if shot_counter.frames_since_last_shot < 30 and shot_counter.last_shot != "neutral"
+                if shot_counter.frames_since_last_shot < self.active_shot_window and shot_counter.last_shot != "neutral"
                 else "neutral"
             )
             results.append(
