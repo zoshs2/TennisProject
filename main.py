@@ -67,11 +67,11 @@ def main(frames, scenes, bounces, ball_track, homography_matrices, kps_court, pe
                 inv_mat = homography_matrices[i]
 
                 # draw ball trajectory
-                if ball_track[i][0]:
+                if ball_track[i][0] is not None and ball_track[i][1] is not None:
                     if draw_trace:
                         for j in range(0, trace):
                             if i-j >= 0:
-                                if ball_track[i-j][0]:
+                                if ball_track[i-j][0] is not None and ball_track[i-j][1] is not None:
                                     draw_x = int(ball_track[i-j][0])
                                     draw_y = int(ball_track[i-j][1])
                                     img_res = cv2.circle(frames[i], (draw_x, draw_y),
@@ -177,6 +177,11 @@ if __name__ == '__main__':
     parser.add_argument('--path_bounce_model', type=str, help='path to pretrained model for bounce detection')
     parser.add_argument('--path_input_video', type=str, help='path to input video')
     parser.add_argument('--path_output_video', type=str, help='path to output video')
+    parser.add_argument('--ball_max_dist', type=float, default=80.0, help='max distance between consecutive ball detections')
+    parser.add_argument('--bounce_threshold', type=float, default=0.45, help='decision threshold for bounce regressor')
+    parser.add_argument('--person_min_score', type=float, default=0.85, help='minimum detector confidence for person boxes')
+    parser.add_argument('--disable_bounce_smoothing', action='store_true', help='disable trajectory smoothing before bounce prediction')
+    parser.add_argument('--filter_players', action='store_true', help='keep only one player on each side of court')
     parser.add_argument('--path_shot_model', type=str, default=None, help='path to tennis_shot_recognition RNN model')
     parser.add_argument(
         '--path_shot_project',
@@ -185,6 +190,10 @@ if __name__ == '__main__':
         help='path to tennis_shot_recognition project root',
     )
     parser.add_argument('--shot_left_handed', action='store_true', help='whether player is left-handed')
+    parser.add_argument('--shot_window_size', type=int, default=30, help='shot model sequence window size')
+    parser.add_argument('--shot_conf_threshold', type=float, default=0.98, help='shot confidence threshold')
+    parser.add_argument('--shot_min_gap_frames', type=int, default=60, help='minimum frame gap between counted shots')
+    parser.add_argument('--shot_active_window', type=int, default=30, help='frames to keep shot label active after detection')
     args = parser.parse_args()
     
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -192,7 +201,7 @@ if __name__ == '__main__':
     scenes = scene_detect(args.path_input_video)    
 
     print('ball detection')
-    ball_detector = BallDetector(args.path_ball_track_model, device)
+    ball_detector = BallDetector(args.path_ball_track_model, device, max_dist=args.ball_max_dist)
     ball_track = ball_detector.infer_model(frames)
 
     print('court detection')
@@ -200,14 +209,14 @@ if __name__ == '__main__':
     homography_matrices, kps_court = court_detector.infer_model(frames)
 
     print('person detection')
-    person_detector = PersonDetector(device)
-    persons_top, persons_bottom = person_detector.track_players(frames, homography_matrices, filter_players=False)
+    person_detector = PersonDetector(device, person_min_score=args.person_min_score)
+    persons_top, persons_bottom = person_detector.track_players(frames, homography_matrices, filter_players=args.filter_players)
 
     # bounce detection
-    bounce_detector = BounceDetector(args.path_bounce_model)
+    bounce_detector = BounceDetector(args.path_bounce_model, threshold=args.bounce_threshold)
     x_ball = [x[0] for x in ball_track]
     y_ball = [x[1] for x in ball_track]
-    bounces = bounce_detector.predict(x_ball, y_ball)
+    bounces = bounce_detector.predict(x_ball, y_ball, smooth=not args.disable_bounce_smoothing)
 
     shot_results = None
     if args.path_shot_model:
@@ -217,6 +226,10 @@ if __name__ == '__main__':
                 shot_project_dir=args.path_shot_project,
                 model_path=args.path_shot_model,
                 left_handed=args.shot_left_handed,
+                window_size=args.shot_window_size,
+                confidence_threshold=args.shot_conf_threshold,
+                min_frames_between_shots=args.shot_min_gap_frames,
+                active_shot_window=args.shot_active_window,
             )
             shot_results = shot_recognizer.infer(frames)
         except Exception as e:
@@ -226,8 +239,5 @@ if __name__ == '__main__':
                     draw_trace=True, shot_results=shot_results)
 
     write(imgs_res, fps, args.path_output_video)
-
-
-
 
 

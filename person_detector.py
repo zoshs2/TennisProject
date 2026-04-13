@@ -8,11 +8,12 @@ from scipy.spatial import distance
 from tqdm import tqdm
 
 class PersonDetector():
-    def __init__(self, dtype=torch.FloatTensor):
+    def __init__(self, dtype=torch.FloatTensor, person_min_score=0.85):
         self.detection_model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True)
         self.detection_model = self.detection_model.to(dtype)
         self.detection_model.eval()
         self.dtype = dtype
+        self.person_min_score = person_min_score
         self.court_ref = CourtReference()
         self.ref_top_court = self.court_ref.get_court_mask(2)
         self.ref_bottom_court = self.court_ref.get_court_mask(1)
@@ -22,7 +23,9 @@ class PersonDetector():
         self.counter_bottom = 0
 
         
-    def detect(self, image, person_min_score=0.85): 
+    def detect(self, image, person_min_score=None):
+        if person_min_score is None:
+            person_min_score = self.person_min_score
         PERSON_LABEL = 1
         frame_tensor = image.transpose((2, 0, 1)) / 255
         frame_tensor = torch.from_numpy(frame_tensor).unsqueeze(0).float().to(self.dtype)
@@ -44,7 +47,7 @@ class PersonDetector():
         mask_bottom_court = cv2.warpPerspective(self.ref_bottom_court, matrix, image.shape[1::-1])
         person_bboxes_top, person_bboxes_bottom = [], []
 
-        bboxes, probs = self.detect(image, person_min_score=0.85)
+        bboxes, probs = self.detect(image)
         if len(bboxes) > 0:
             person_points = [[int((bbox[2] + bbox[0]) / 2), int(bbox[3])] for bbox in bboxes]
             person_bboxes = list(zip(bboxes, person_points))
@@ -89,5 +92,4 @@ class PersonDetector():
             persons_top.append(person_top)
             persons_bottom.append(person_bottom)
         return persons_top, persons_bottom    
-
 
