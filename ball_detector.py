@@ -82,7 +82,7 @@ class BallDetector:
                     if dist < best_dist:
                         best_dist = dist
                         best_point = (x_temp, y_temp)
-                if best_point is not None and best_dist < self.max_dist:
+                if best_point is not None and best_dist < max_dist:
                     x, y = best_point
             else:
                 x = circles[0][0][0]*scale
