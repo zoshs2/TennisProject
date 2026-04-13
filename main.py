@@ -67,11 +67,11 @@ def main(frames, scenes, bounces, ball_track, homography_matrices, kps_court, pe
                 inv_mat = homography_matrices[i]
 
                 # draw ball trajectory
-                if ball_track[i][0]:
+                if ball_track[i][0] is not None and ball_track[i][1] is not None:
                     if draw_trace:
                         for j in range(0, trace):
                             if i-j >= 0:
-                                if ball_track[i-j][0]:
+                                if ball_track[i-j][0] is not None and ball_track[i-j][1] is not None:
                                     draw_x = int(ball_track[i-j][0])
                                     draw_y = int(ball_track[i-j][1])
                                     img_res = cv2.circle(frames[i], (draw_x, draw_y),
@@ -226,7 +226,6 @@ if __name__ == '__main__':
                     draw_trace=True, shot_results=shot_results)
 
     write(imgs_res, fps, args.path_output_video)
-
 
 
 
