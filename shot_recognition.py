@@ -65,6 +65,29 @@ class RNNShotRecognizer:
         self._keras = keras
         self._HumanPoseExtractor = HumanPoseExtractor
         self._model = self._keras.models.load_model(self.model_path)
+        self.window_size = self._resolve_window_size(self.window_size)
+
+    def _resolve_window_size(self, requested_window_size: int) -> int:
+        """
+        Ensure runtime window size matches the loaded model's expected sequence length.
+        """
+        try:
+            input_shape = getattr(self._model, "input_shape", None)
+            if isinstance(input_shape, list):
+                input_shape = input_shape[0]
+            expected_window = None
+            if input_shape and len(input_shape) >= 2:
+                expected_window = input_shape[1]
+            if isinstance(expected_window, int) and expected_window > 0:
+                if expected_window != requested_window_size:
+                    print(
+                        f"Warning: overriding shot_window_size={requested_window_size} "
+                        f"with model-required value {expected_window}",
+                    )
+                return expected_window
+        except Exception:
+            pass
+        return requested_window_size
 
     def infer(self, frames: List[np.ndarray]) -> List[Dict[str, Any]]:
         if not frames:

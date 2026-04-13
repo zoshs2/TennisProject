@@ -162,7 +162,8 @@ def main(frames, scenes, bounces, ball_track, homography_matrices, kps_court, pe
  
 def write(imgs_res, fps, path_output_video):
     height, width = imgs_res[0].shape[:2]
-    out = cv2.VideoWriter(path_output_video, cv2.VideoWriter_fourcc(*'DIVX'), fps, (width, height))
+    fourcc = 'mp4v' if path_output_video.lower().endswith('.mp4') else 'DIVX'
+    out = cv2.VideoWriter(path_output_video, cv2.VideoWriter_fourcc(*fourcc), fps, (width, height))
     for num in range(len(imgs_res)):
         frame = imgs_res[num]
         out.write(frame)
@@ -239,5 +240,4 @@ if __name__ == '__main__':
                     draw_trace=True, shot_results=shot_results)
 
     write(imgs_res, fps, args.path_output_video)
-
 
