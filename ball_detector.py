@@ -60,7 +60,6 @@ class BallDetector:
             feature_map: feature map with shape (1,360,640)
             prev_pred: [x,y] coordinates of ball prediction from previous frame
             scale: scale for conversion to original shape (720,1280)
-            max_dist: maximum distance from previous ball detection to remove outliers
         :return
             x,y ball coordinates
         """
