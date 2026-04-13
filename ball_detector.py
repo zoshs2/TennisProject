@@ -63,6 +63,8 @@ class BallDetector:
         :return
             x,y ball coordinates
         """
+        if max_dist is None:
+            max_dist = self.max_dist
         feature_map *= 255
         feature_map = feature_map.reshape((self.height, self.width))
         feature_map = feature_map.astype(np.uint8)
