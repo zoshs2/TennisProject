@@ -5,9 +5,9 @@ from scipy.interpolate import CubicSpline
 from scipy.spatial import distance
 
 class BounceDetector:
-    def __init__(self, path_model=None):
+    def __init__(self, path_model=None, threshold=0.45):
         self.model = ctb.CatBoostRegressor()
-        self.threshold = 0.45
+        self.threshold = threshold
         if path_model:
             self.load_model(path_model)
         
@@ -34,7 +34,8 @@ class BounceDetector:
         for i in range(1, num):
             labels = labels[labels['x_lag_{}'.format(i)].notna()]
             labels = labels[labels['x_lag_inv_{}'.format(i)].notna()]
-        labels = labels[labels['x-coordinate'].notna()] 
+        labels = labels[labels['x-coordinate'].notna()]
+        labels = labels[labels['y-coordinate'].notna()]
         
         colnames_x = ['x_diff_{}'.format(i) for i in range(1, num)] + \
                      ['x_diff_inv_{}'.format(i) for i in range(1, num)] + \
@@ -48,6 +49,8 @@ class BounceDetector:
         return features, list(labels['frame'])
     
     def predict(self, x_ball, y_ball, smooth=True):
+        x_ball = list(x_ball)
+        y_ball = list(y_ball)
         if smooth:
             x_ball, y_ball = self.smooth_predictions(x_ball, y_ball)
         features, num_frames = self.prepare_features(x_ball, y_ball)
@@ -63,12 +66,12 @@ class BounceDetector:
         interp = 5
         counter = 0
         for num in range(interp, len(x_ball)-1):
-            if not x_ball[num] and sum(is_none[num-interp:num]) == 0 and counter < 3:
+            if x_ball[num] is None and sum(is_none[num-interp:num]) == 0 and counter < 3:
                 x_ext, y_ext = self.extrapolate(x_ball[num-interp:num], y_ball[num-interp:num])
                 x_ball[num] = x_ext
                 y_ball[num] = y_ext
                 is_none[num] = 0
-                if x_ball[num+1]:
+                if x_ball[num+1] is not None and y_ball[num+1] is not None:
                     dist = distance.euclidean((x_ext, y_ext), (x_ball[num+1], y_ball[num+1]))
                     if dist > 80:
                         x_ball[num+1], y_ball[num+1], is_none[num+1] = None, None, 1
@@ -94,5 +97,3 @@ class BounceDetector:
             elif preds[ind_bounce[i]] > preds[ind_bounce[i-1]]:
                 ind_bounce_filtered[-1] = ind_bounce[i]
         return ind_bounce_filtered
-
-
