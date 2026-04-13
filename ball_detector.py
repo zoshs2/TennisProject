@@ -54,13 +54,12 @@ class BallDetector:
                 ball_track.append((x_pred, y_pred))
         return ball_track
 
-    def postprocess(self, feature_map, prev_pred, scale=2, max_dist=None):
+    def postprocess(self, feature_map, prev_pred, scale=2):
         """
         :params
             feature_map: feature map with shape (1,360,640)
             prev_pred: [x,y] coordinates of ball prediction from previous frame
             scale: scale for conversion to original shape (720,1280)
-            max_dist: maximum distance from previous ball detection to remove outliers
         :return
             x,y ball coordinates
         """
@@ -84,7 +83,7 @@ class BallDetector:
                     if dist < best_dist:
                         best_dist = dist
                         best_point = (x_temp, y_temp)
-                if best_point is not None and best_dist < max_dist:
+                if best_point is not None and best_dist < self.max_dist:
                     x, y = best_point
             else:
                 x = circles[0][0][0]*scale
