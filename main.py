@@ -177,6 +177,11 @@ if __name__ == '__main__':
     parser.add_argument('--path_bounce_model', type=str, help='path to pretrained model for bounce detection')
     parser.add_argument('--path_input_video', type=str, help='path to input video')
     parser.add_argument('--path_output_video', type=str, help='path to output video')
+    parser.add_argument('--ball_max_dist', type=float, default=80.0, help='max distance between consecutive ball detections')
+    parser.add_argument('--bounce_threshold', type=float, default=0.45, help='decision threshold for bounce regressor')
+    parser.add_argument('--person_min_score', type=float, default=0.85, help='minimum detector confidence for person boxes')
+    parser.add_argument('--disable_bounce_smoothing', action='store_true', help='disable trajectory smoothing before bounce prediction')
+    parser.add_argument('--filter_players', action='store_true', help='keep only one player on each side of court')
     parser.add_argument('--path_shot_model', type=str, default=None, help='path to tennis_shot_recognition RNN model')
     parser.add_argument(
         '--path_shot_project',
@@ -192,7 +197,7 @@ if __name__ == '__main__':
     scenes = scene_detect(args.path_input_video)    
 
     print('ball detection')
-    ball_detector = BallDetector(args.path_ball_track_model, device)
+    ball_detector = BallDetector(args.path_ball_track_model, device, max_dist=args.ball_max_dist)
     ball_track = ball_detector.infer_model(frames)
 
     print('court detection')
@@ -200,14 +205,14 @@ if __name__ == '__main__':
     homography_matrices, kps_court = court_detector.infer_model(frames)
 
     print('person detection')
-    person_detector = PersonDetector(device)
-    persons_top, persons_bottom = person_detector.track_players(frames, homography_matrices, filter_players=False)
+    person_detector = PersonDetector(device, person_min_score=args.person_min_score)
+    persons_top, persons_bottom = person_detector.track_players(frames, homography_matrices, filter_players=args.filter_players)
 
     # bounce detection
-    bounce_detector = BounceDetector(args.path_bounce_model)
+    bounce_detector = BounceDetector(args.path_bounce_model, threshold=args.bounce_threshold)
     x_ball = [x[0] for x in ball_track]
     y_ball = [x[1] for x in ball_track]
-    bounces = bounce_detector.predict(x_ball, y_ball)
+    bounces = bounce_detector.predict(x_ball, y_ball, smooth=not args.disable_bounce_smoothing)
 
     shot_results = None
     if args.path_shot_model:

@@ -5,9 +5,9 @@ from scipy.interpolate import CubicSpline
 from scipy.spatial import distance
 
 class BounceDetector:
-    def __init__(self, path_model=None):
+    def __init__(self, path_model=None, threshold=0.45):
         self.model = ctb.CatBoostRegressor()
-        self.threshold = 0.45
+        self.threshold = threshold
         if path_model:
             self.load_model(path_model)
         

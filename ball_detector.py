@@ -6,9 +6,21 @@ from scipy.spatial import distance
 from tqdm import tqdm
 
 class BallDetector:
-    def __init__(self, path_model=None, device='cuda'):
+    def __init__(
+        self,
+        path_model=None,
+        device='cuda',
+        max_dist=80,
+        heatmap_thresh=127,
+        min_radius=2,
+        max_radius=7,
+    ):
         self.model = BallTrackerNet(input_channels=9, out_channels=256)
         self.device = device
+        self.max_dist = max_dist
+        self.heatmap_thresh = heatmap_thresh
+        self.min_radius = min_radius
+        self.max_radius = max_radius
         if path_model:
             self.model.load_state_dict(torch.load(path_model, map_location=device))
             self.model = self.model.to(device)
@@ -42,7 +54,7 @@ class BallDetector:
                 ball_track.append((x_pred, y_pred))
         return ball_track
 
-    def postprocess(self, feature_map, prev_pred, scale=2, max_dist=80):
+    def postprocess(self, feature_map, prev_pred, scale=2):
         """
         :params
             feature_map: feature map with shape (1,360,640)
@@ -55,9 +67,9 @@ class BallDetector:
         feature_map *= 255
         feature_map = feature_map.reshape((self.height, self.width))
         feature_map = feature_map.astype(np.uint8)
-        ret, heatmap = cv2.threshold(feature_map, 127, 255, cv2.THRESH_BINARY)
-        circles = cv2.HoughCircles(heatmap, cv2.HOUGH_GRADIENT, dp=1, minDist=1, param1=50, param2=2, minRadius=2,
-                                   maxRadius=7)
+        ret, heatmap = cv2.threshold(feature_map, self.heatmap_thresh, 255, cv2.THRESH_BINARY)
+        circles = cv2.HoughCircles(heatmap, cv2.HOUGH_GRADIENT, dp=1, minDist=1, param1=50, param2=2, minRadius=self.min_radius,
+                                   maxRadius=self.max_radius)
         x, y = None, None
         if circles is not None:
             if prev_pred[0] is not None and prev_pred[1] is not None:
