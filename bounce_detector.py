@@ -97,4 +97,3 @@ class BounceDetector:
             elif preds[ind_bounce[i]] > preds[ind_bounce[i-1]]:
                 ind_bounce_filtered[-1] = ind_bounce[i]
         return ind_bounce_filtered
-

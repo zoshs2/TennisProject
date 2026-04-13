@@ -54,7 +54,7 @@ class BallDetector:
                 ball_track.append((x_pred, y_pred))
         return ball_track
 
-    def postprocess(self, feature_map, prev_pred, scale=2):
+    def postprocess(self, feature_map, prev_pred, scale=2, max_dist=None):
         """
         :params
             feature_map: feature map with shape (1,360,640)
@@ -64,6 +64,8 @@ class BallDetector:
         :return
             x,y ball coordinates
         """
+        if max_dist is None:
+            max_dist = self.max_dist
         feature_map *= 255
         feature_map = feature_map.reshape((self.height, self.width))
         feature_map = feature_map.astype(np.uint8)
